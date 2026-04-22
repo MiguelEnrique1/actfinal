@@ -4,7 +4,7 @@ $conn = pg_connect("
   port=5432
   dbname=aranceles
   user=aranceles_user
-  password=TU_PASSWORD_NUEVA
+  password=XRnzqfID3rcBppX3TuGPiRq75I4DOwLC
 ");
 
 if(!$conn){
