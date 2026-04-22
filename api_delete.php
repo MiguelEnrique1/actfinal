@@ -3,6 +3,11 @@ include("conexion.php");
 
 $data = json_decode(file_get_contents("php://input"), true);
 
+if(!$data || !isset($data["tabla"]) || !isset($data["id"])){
+  echo json_encode(["error"=>"Datos incompletos"]);
+  exit;
+}
+
 $tabla = $data["tabla"];
 $id = intval($data["id"]);
 
