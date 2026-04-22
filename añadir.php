@@ -1,17 +1,29 @@
 <?php
 session_start();
 
-// Conexión a la BD
-$conn = new mysqli("HOST","USER","PASSWORD","DB");
-if($conn->connect_error){
-  die("Error de conexión: " . $conn->connect_error);
+// Conexión a PostgreSQL
+$conn = pg_connect("
+  host=dpg-d7k2ck2qqhas73bs3mhg-a
+  port=5432
+  dbname=aranceles
+  user=aranceles_user
+  password=XRnzqfID3rcBppX3TuGPiRq75I4DOwLC
+");
+
+if(!$conn){
+  die("Error de conexión a la base de datos");
 }
 
 // Obtener tablas existentes
-$res = $conn->query("SHOW TABLES");
+$res = pg_query($conn, "
+  SELECT table_name 
+  FROM information_schema.tables 
+  WHERE table_schema = 'public'
+");
+
 $tablas = [];
-while($row = $res->fetch_array()){
-  $tablas[] = $row[0];
+while($row = pg_fetch_assoc($res)){
+  $tablas[] = $row['table_name'];
 }
 $total = count($tablas);
 
@@ -22,49 +34,56 @@ $nuevaTabla = "";
 if($_SERVER["REQUEST_METHOD"]==="POST" && isset($_POST["crearTabla"])){
   if(isset($_POST["nuevaTabla"]) && $_POST["nuevaTabla"]!=""){
     $nuevaTabla = trim($_POST["nuevaTabla"]);
-    $sql = "CREATE TABLE `$nuevaTabla` (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      nombre VARCHAR(100),
-      valor DECIMAL(10,2),
-      fecha_registro DATETIME
-    )";
-    if($conn->query($sql)){
+
+    $sql = "
+      CREATE TABLE $nuevaTabla (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(100),
+        valor NUMERIC(10,2),
+        fecha_registro TIMESTAMP
+      )
+    ";
+
+    if(pg_query($conn, $sql)){
       $mensaje = "Tabla '$nuevaTabla' creada correctamente.";
       $tablas[] = $nuevaTabla;
       $total++;
     } else {
-      $mensaje = "Error al crear tabla: " . $conn->error;
+      $mensaje = "Error al crear tabla.";
     }
   }
 }
 
-// Insertar objeto en tabla seleccionada
+// Insertar objeto
 if($_SERVER["REQUEST_METHOD"]==="POST" && isset($_POST["insertarObjeto"])){
   $tabla = $_POST["tabla"];
   $nombre = $_POST["nombre"];
   $valor = $_POST["valor"];
   $fecha = $_POST["fecha_registro"];
 
-  $stmt = $conn->prepare("INSERT INTO `$tabla` (nombre, valor, fecha_registro) VALUES (?,?,?)");
-  $stmt->bind_param("sds",$nombre,$valor,$fecha);
-  if($stmt->execute()){
+  $sql = "INSERT INTO $tabla (nombre, valor, fecha_registro) VALUES ($1, $2, $3)";
+  $result = pg_query_params($conn, $sql, [$nombre, $valor, $fecha]);
+
+  if($result){
     $mensaje = "Objeto añadido correctamente en '$tabla'.";
   } else {
-    $mensaje = "Error al insertar: " . $conn->error;
+    $mensaje = "Error al insertar datos.";
   }
 }
 
-// Asignar imágenes persistentes a las tablas
+// Imágenes
 $imagenes = glob("img/*.{jpg,png,jpeg}", GLOB_BRACE);
 if(!isset($_SESSION["imagenes_tablas"])){
   $_SESSION["imagenes_tablas"] = [];
 }
+
 foreach($tablas as $t){
   if(!isset($_SESSION["imagenes_tablas"][$t])){
     shuffle($imagenes);
     $_SESSION["imagenes_tablas"][$t] = $imagenes[0];
   }
 }
+
 $imagenes_tablas = $_SESSION["imagenes_tablas"];
 ?>
 <!DOCTYPE html>
@@ -97,15 +116,17 @@ function toggleIngresar(){
       <button onclick="window.location.href='consultar.php'">Consultar</button>
     </div>
   </div>
+
   <div class="hero">
-    <h1>Actualmente hay <?php echo $total; ?> tabla(s) en la base de datos</h1>
+    <h1>Actualmente hay <?php echo $total; ?> tabla(s)</h1>
+
     <div class="imagenes-tablas">
       <?php 
       $contador = 1;
       foreach($tablas as $t){ 
         $img = $imagenes_tablas[$t];
         echo "<div class='item'>";
-        echo "<img src='$img' alt='Tabla $contador'>";
+        echo "<img src='$img'>";
         echo "<p>Tabla $contador: $t</p>";
         echo "</div>";
         $contador++;
@@ -119,27 +140,28 @@ function toggleIngresar(){
   <h2>Gestión de Tablas</h2>
   <?php if($mensaje) echo "<p style='color:green'>$mensaje</p>"; ?>
 
-  <!-- Formulario para crear nueva tabla -->
+  <!-- Crear tabla -->
   <form method="POST">
     <input type="hidden" name="crearTabla" value="1">
     <label>
       <input type="checkbox" id="checkNueva" onclick="toggleCampo()"> Crear nueva tabla
     </label>
     <div id="campoNombre" style="display:none;">
-      <input type="text" name="nuevaTabla" placeholder="Ingresa nombre de la nueva tabla">
+      <input type="text" name="nuevaTabla" placeholder="Nombre de la tabla">
     </div>
     <br>
     <button type="submit">Crear</button>
   </form>
 
-  <!-- Opción para ingresar datos en tabla existente -->
+  <!-- Insertar datos -->
   <form method="POST">
     <input type="hidden" name="insertarObjeto" value="1">
     <label>
-      <input type="checkbox" id="checkIngresar" onclick="toggleIngresar()"> Ingresar datos en tabla existente
+      <input type="checkbox" id="checkIngresar" onclick="toggleIngresar()"> Insertar datos
     </label>
+
     <div id="campoIngresar" style="display:none;">
-      <label>Selecciona la tabla:</label><br>
+      <label>Tabla:</label><br>
       <select name="tabla" required>
         <option value="">-- Selecciona --</option>
         <?php foreach($tablas as $t){ echo "<option value='$t'>$t</option>"; } ?>
@@ -151,10 +173,10 @@ function toggleIngresar(){
       <label>Valor:</label><br>
       <input type="number" step="0.01" name="valor" required><br><br>
 
-      <label>Fecha de registro:</label><br>
+      <label>Fecha:</label><br>
       <input type="datetime-local" name="fecha_registro" required><br><br>
 
-      <button type="submit">Guardar objeto</button>
+      <button type="submit">Guardar</button>
     </div>
   </form>
 </div>
