@@ -1,12 +1,8 @@
 <?php
-// Datos de conexión
-$host = "localhost";
-$user = "root";       // tu usuario de MySQL
-$password = "";       // tu contraseña de MySQL
-$dbname = "aranceles";
+
 
 // Crear conexión
-$conn = new mysqli($host, $user, $password, $dbname);
+$conn = new mysqli("HOST","USER","PASSWORD","DB");
 
 // Verificar conexión
 if ($conn->connect_error) {
