@@ -2,7 +2,7 @@
 session_start();
 
 // Conexión a la BD
-$conn = new mysqli("localhost","root","","aranceles");
+$conn = new mysqli("HOST","USER","PASSWORD","DB");
 if($conn->connect_error){
   die("Error de conexión: " . $conn->connect_error);
 }
